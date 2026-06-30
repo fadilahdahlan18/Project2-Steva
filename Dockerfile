@@ -16,8 +16,15 @@ RUN apt-get update && apt-get install -y \
 # Install PHP extensions
 RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 
-# Fix Apache MPM conflict (php:8.1-apache has both mpm_prefork & mpm_event)
-RUN a2dismod mpm_event && a2enmod mpm_prefork
+# -------------------------------------------------------
+# CRITICAL: Remove mpm_event module files physically so
+# Apache cannot load them at runtime (prevents MPM conflict)
+# -------------------------------------------------------
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.conf \
+          /etc/apache2/mods-enabled/mpm_event.load \
+    && rm -f /etc/apache2/mods-available/mpm_event.conf \
+             /etc/apache2/mods-available/mpm_event.load \
+    && a2enmod mpm_prefork
 
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
@@ -53,28 +60,10 @@ RUN echo '<Directory /var/www/html/public>\n\
 </Directory>' > /etc/apache2/conf-available/laravel.conf \
     && a2enconf laravel
 
-# Railway sets $PORT dynamically - Apache must listen on that port
-# Startup script: configure port, migrate, then start Apache
-RUN printf '#!/bin/bash\n\
-set -e\n\
-\n\
-# Use PORT from Railway (default 80)\n\
-APACHE_PORT=${PORT:-80}\n\
-\n\
-# Update Apache to listen on the correct port\n\
-sed -i "s/Listen 80/Listen ${APACHE_PORT}/" /etc/apache2/ports.conf\n\
-sed -i "s/<VirtualHost \\*:80>/<VirtualHost *:${APACHE_PORT}>/" /etc/apache2/sites-available/000-default.conf\n\
-\n\
-# Run Laravel setup\n\
-php artisan migrate --force || true\n\
-php artisan config:cache || true\n\
-php artisan route:cache || true\n\
-php artisan view:cache || true\n\
-\n\
-# Start Apache\n\
-apache2-foreground\n' > /usr/local/bin/start.sh \
-    && chmod +x /usr/local/bin/start.sh
+# Copy and set the entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 EXPOSE 80
 
-CMD ["/usr/local/bin/start.sh"]
+CMD ["/usr/local/bin/docker-entrypoint.sh"]

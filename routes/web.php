@@ -3,6 +3,13 @@
 use Illuminate\Support\Facades\Route;
 
 // -------------------------------------------------------
+// Health Check (for Railway / Docker health checks)
+// -------------------------------------------------------
+Route::get('/health', function () {
+    return response()->json(['status' => 'ok'], 200);
+});
+
+// -------------------------------------------------------
 // Landing Page
 // -------------------------------------------------------
 Route::get('/', fn() => view('welcome'))->name('landing');
