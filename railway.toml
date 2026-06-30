@@ -1,7 +1,6 @@
-# Railway configuration
+# Railway configuration - use Nixpacks builder (simpler than Dockerfile)
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+builder = "NIXPACKS"
 
 [deploy]
 healthcheckPath = "/"

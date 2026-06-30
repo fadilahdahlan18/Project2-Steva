@@ -1,0 +1,19 @@
+[phases.setup]
+nixPkgs = ["nodejs_18", "php81", "php81Packages.composer"]
+
+[phases.install]
+cmds = [
+    "composer install --optimize-autoloader --no-dev --no-interaction",
+    "npm install --legacy-peer-deps",
+    "npm run production"
+]
+
+[phases.build]
+cmds = [
+    "php artisan config:cache",
+    "php artisan route:cache",
+    "php artisan view:cache"
+]
+
+[start]
+cmd = "php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=$PORT"
