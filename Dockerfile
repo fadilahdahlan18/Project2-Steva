@@ -50,10 +50,28 @@ RUN echo '<Directory /var/www/html/public>\n\
 </Directory>' > /etc/apache2/conf-available/laravel.conf \
     && a2enconf laravel
 
-EXPOSE 80
-
-# Startup script written inline (avoids Windows CRLF issues)
-RUN printf '#!/bin/bash\nset -e\nphp artisan migrate --force\nphp artisan config:cache\nphp artisan route:cache\nphp artisan view:cache\napache2-foreground\n' > /usr/local/bin/start.sh \
+# Railway sets $PORT dynamically - Apache must listen on that port
+# Startup script: configure port, migrate, then start Apache
+RUN printf '#!/bin/bash\n\
+set -e\n\
+\n\
+# Use PORT from Railway (default 80)\n\
+APACHE_PORT=${PORT:-80}\n\
+\n\
+# Update Apache to listen on the correct port\n\
+sed -i "s/Listen 80/Listen ${APACHE_PORT}/" /etc/apache2/ports.conf\n\
+sed -i "s/<VirtualHost \\*:80>/<VirtualHost *:${APACHE_PORT}>/" /etc/apache2/sites-available/000-default.conf\n\
+\n\
+# Run Laravel setup\n\
+php artisan migrate --force || true\n\
+php artisan config:cache || true\n\
+php artisan route:cache || true\n\
+php artisan view:cache || true\n\
+\n\
+# Start Apache\n\
+apache2-foreground\n' > /usr/local/bin/start.sh \
     && chmod +x /usr/local/bin/start.sh
+
+EXPOSE 80
 
 CMD ["/usr/local/bin/start.sh"]
