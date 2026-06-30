@@ -17,22 +17,29 @@ sed -i "s/<VirtualHost \*:80>/<VirtualHost *:${APACHE_PORT}>/" /etc/apache2/site
 # -------------------------------------------------------
 if [ -z "$APP_KEY" ]; then
     echo "[entrypoint] Generating APP_KEY..."
-    php artisan key:generate --force
+    php artisan key:generate --force || true
 fi
 
 # -------------------------------------------------------
-# Laravel setup (non-fatal so Apache still starts)
+# Cache config/routes/views (non-fatal)
 # -------------------------------------------------------
-echo "[entrypoint] Running migrations..."
-php artisan migrate --force || echo "[entrypoint] WARNING: migrate failed, continuing..."
-
 echo "[entrypoint] Caching config/routes/views..."
-php artisan config:cache  || true
-php artisan route:cache   || true
-php artisan view:cache    || true
+php artisan config:cache || true
+php artisan route:cache  || true
+php artisan view:cache   || true
 
 # -------------------------------------------------------
-# Start Apache
+# Run migrations in BACKGROUND after Apache starts
+# Apache must start FIRST so health check can pass
+# -------------------------------------------------------
+(
+    echo "[entrypoint] Waiting 10s then running migrations in background..."
+    sleep 10
+    php artisan migrate --force && echo "[entrypoint] Migrations done!" || echo "[entrypoint] WARNING: migrate failed"
+) &
+
+# -------------------------------------------------------
+# Start Apache in foreground
 # -------------------------------------------------------
 echo "[entrypoint] Starting Apache on port ${APACHE_PORT}..."
 exec apache2-foreground
