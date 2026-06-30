@@ -19,12 +19,6 @@ RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
 
-# Install Node.js 18 LTS
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
@@ -34,18 +28,15 @@ WORKDIR /var/www/html
 # Copy project files
 COPY . .
 
-# Install PHP dependencies
+# Install PHP dependencies only (skip npm/webpack build)
 RUN composer install --optimize-autoloader --no-dev --no-interaction --no-progress
-
-# Install Node dependencies & build assets
-RUN npm install --legacy-peer-deps && npm run production && rm -rf node_modules
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage \
     && chmod -R 755 /var/www/html/bootstrap/cache
 
-# Configure Apache document root to /public
+# Configure Apache document root to public/
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
 
 RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
@@ -61,8 +52,8 @@ RUN echo '<Directory /var/www/html/public>\n\
 
 EXPOSE 80
 
-# Write startup script inline (avoids CRLF issues from Windows)
-RUN printf '#!/bin/bash\nset -e\n\nphp artisan migrate --force\nphp artisan config:cache\nphp artisan route:cache\nphp artisan view:cache\n\napache2-foreground\n' > /usr/local/bin/start.sh \
+# Startup script written inline (avoids Windows CRLF issues)
+RUN printf '#!/bin/bash\nset -e\nphp artisan migrate --force\nphp artisan config:cache\nphp artisan route:cache\nphp artisan view:cache\napache2-foreground\n' > /usr/local/bin/start.sh \
     && chmod +x /usr/local/bin/start.sh
 
 CMD ["/usr/local/bin/start.sh"]
