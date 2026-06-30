@@ -17,11 +17,13 @@ php artisan config:cache || true
 php artisan route:cache  || true
 php artisan view:cache   || true
 
-# Jalankan migration di background setelah server siap
+# Jalankan migration + seed di background setelah server siap
 (
     sleep 15
     echo "[migrate] Running migrations..."
-    php artisan migrate --force && echo "[migrate] Done!" || echo "[migrate] WARNING: failed"
+    php artisan migrate --force && echo "[migrate] Done!" || echo "[migrate] WARNING: migrate failed"
+    echo "[seed] Running seeders..."
+    php artisan db:seed --force && echo "[seed] Done!" || echo "[seed] WARNING: seed failed"
 ) &
 
 # Start PHP built-in server (no Apache, no MPM issues)
